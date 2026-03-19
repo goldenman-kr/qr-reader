@@ -1,22 +1,37 @@
 import SwiftUI
 
 struct PhoneCameraFrameView<PreviewContent: View>: View {
+    struct SourceOption: Identifiable {
+        let source: CaptureSource
+        let title: String
+        var id: String { source.id + ":" + title }
+    }
+
     let size: CGSize
     let onShutterTap: () -> Void
-    let selectedSource: CaptureSource
+    let selectedSourceTitle: String
+    let sourceOptions: [SourceOption]
+    let statusMessage: String
     let onSelectSource: (CaptureSource) -> Void
+    @State private var isSourcePopoverPresented = false
     @ViewBuilder var previewContent: PreviewContent
 
     init(
         size: CGSize = CGSize(width: 320, height: 680),
         onShutterTap: @escaping () -> Void = {},
-        selectedSource: CaptureSource = .screen,
+        selectedSourceTitle: String = "Screen",
+        sourceOptions: [SourceOption] = [
+            .init(source: .screen, title: "Screen")
+        ],
+        statusMessage: String = "",
         onSelectSource: @escaping (CaptureSource) -> Void = { _ in },
         @ViewBuilder previewContent: () -> PreviewContent
     ) {
         self.size = size
         self.onShutterTap = onShutterTap
-        self.selectedSource = selectedSource
+        self.selectedSourceTitle = selectedSourceTitle
+        self.sourceOptions = sourceOptions
+        self.statusMessage = statusMessage
         self.onSelectSource = onSelectSource
         self.previewContent = previewContent()
     }
@@ -78,7 +93,7 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
     }
 
     private var controlsArea: some View {
-        ZStack {
+        VStack(spacing: 8) {
             Button(action: onShutterTap) {
                 Circle()
                     .fill(.white)
@@ -90,33 +105,75 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.space, modifiers: [])
-            
-            HStack {
-                Spacer()
-                Menu {
-                    Button("Screen") { onSelectSource(.screen) }
-                    Button("Camera") { onSelectSource(.camera(deviceID: nil)) }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "rectangle.stack.badge.person.crop")
-                        Text(selectedSource.displayName)
-                            .font(.caption)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(.white.opacity(0.95))
-                    .padding(.horizontal, 10)
-                    .frame(height: 36)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color(nsColor: NSColor(calibratedWhite: 0.22, alpha: 1.0)))
-                    )
+
+            Button {
+                isSourcePopoverPresented.toggle()
+                #if DEBUG
+                print("[SourceSelector] tapped, popover=\(isSourcePopoverPresented)")
+                #endif
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "rectangle.stack.badge.person.crop")
+                    Text(selectedSourceTitle)
+                        .font(.caption)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+                .foregroundStyle(.white.opacity(0.95))
+                .padding(.horizontal, 10)
+                .frame(height: 36)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color(nsColor: NSColor(calibratedWhite: 0.22, alpha: 1.0)))
+                )
             }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .contentShape(Rectangle())
+            .popover(isPresented: $isSourcePopoverPresented, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button("Screen") {
+                        onSelectSource(.screen)
+                        isSourcePopoverPresented = false
+                    }
+                    .buttonStyle(.plain)
+
+                    let cameraOptions = sourceOptions.filter {
+                        if case .camera = $0.source { return true }
+                        return false
+                    }
+                    if cameraOptions.isEmpty {
+                        Button("Camera...") {
+                            onSelectSource(.camera(deviceID: nil))
+                            isSourcePopoverPresented = false
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        ForEach(cameraOptions) { option in
+                            Button(option.title) {
+                                onSelectSource(option.source)
+                                isSourcePopoverPresented = false
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(minWidth: 180, alignment: .leading)
+            }
+
+            Text(statusMessage)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.88))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.black)
+                .clipShape(Capsule())
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: size.width - 36)
         }
-        .frame(height: 84)
     }
 
 }

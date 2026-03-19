@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import Foundation
 
@@ -17,20 +18,75 @@ final class MainViewModel: ObservableObject {
     @Published var debugCaptureDisplayHeight: Int = 0
     @Published var debugWindowFrameInScreen: CGRect = .zero
     @Published var debugCaptureVersion: Int = 0
+    @Published private(set) var availableCameras: [CameraDeviceInfo] = []
+    @Published private(set) var cameraAccessDenied: Bool = false
 
     private let historyStore: HistoryStore
     private let oneShotCaptureService = OneShotScreenCaptureService()
+    private let cameraCaptureService = CameraCaptureService()
     private let qrDetector = VisionQRDetector()
 
     init(historyStore: HistoryStore) {
         self.historyStore = historyStore
+        refreshCameraDevices()
     }
 
     func captureAndScan() {
-        guard selectedSource == .screen else {
-            statusMessage = "Camera source is not implemented yet."
-            return
+        switch selectedSource {
+        case .screen:
+            captureAndScanFromScreen()
+        case .camera:
+            captureAndScanFromCamera()
         }
+    }
+
+    func selectSource(_ source: CaptureSource) {
+        selectedSource = source
+        switch source {
+        case .screen:
+            cameraCaptureService.stop()
+            cameraAccessDenied = false
+            statusMessage = "Screen mode."
+        case .camera(let deviceID):
+            activateCameraSource(deviceID: deviceID)
+        }
+    }
+
+    func refreshCameraDevices() {
+        availableCameras = cameraCaptureService.discoverDevices()
+    }
+
+    var sourceOptions: [(source: CaptureSource, title: String)] {
+        let cameraOptions = availableCameras.map { camera in
+            (source: CaptureSource.camera(deviceID: camera.id), title: camera.name)
+        }
+        return [(source: .screen, title: "Screen")] + cameraOptions
+    }
+
+    var selectedSourceTitle: String {
+        switch selectedSource {
+        case .screen:
+            return "Screen"
+        case .camera(let deviceID):
+            if let deviceID, let match = availableCameras.first(where: { $0.id == deviceID }) {
+                return match.name
+            }
+            return "Camera"
+        }
+    }
+
+    var shouldShowCameraPreview: Bool {
+        if case .camera = selectedSource {
+            return !cameraAccessDenied
+        }
+        return false
+    }
+
+    var cameraSession: AVCaptureSession {
+        cameraCaptureService.session
+    }
+
+    private func captureAndScanFromScreen() {
         guard !windowContentRectInScreen.isEmpty else {
             statusMessage = "Window content rect not ready."
             return
@@ -100,6 +156,82 @@ final class MainViewModel: ObservableObject {
                     self.statusMessage = "Capture/scan failed."
                 }
             }
+        }
+    }
+
+    private func captureAndScanFromCamera() {
+        statusMessage = "Capturing camera frame..."
+        Task {
+            do {
+                let image = try cameraCaptureService.captureCurrentFrame()
+                let results = try qrDetector.detect(in: image)
+                await MainActor.run {
+                    self.latestResults = results
+                    if results.isEmpty {
+                        self.statusMessage = "No QR code found."
+                    } else {
+                        let historyItem = ScanHistoryItem(source: self.selectedSource, results: results)
+                        self.historyStore.append(historyItem)
+                        self.statusMessage = "Detected \(results.count) QR code(s)"
+                    }
+                }
+            } catch CameraCaptureError.frameUnavailable {
+                await MainActor.run {
+                    self.statusMessage = "Camera frame unavailable."
+                }
+            } catch {
+                await MainActor.run {
+                    self.statusMessage = "Capture/scan failed."
+                }
+            }
+        }
+    }
+
+    private func activateCameraSource(deviceID: String?) {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            startCamera(deviceID: deviceID)
+        case .notDetermined:
+            Task {
+                let granted = await CameraCaptureService.requestAccess()
+                await MainActor.run {
+                    if granted {
+                        self.cameraAccessDenied = false
+                        self.startCamera(deviceID: deviceID)
+                    } else {
+                        self.cameraAccessDenied = true
+                        self.statusMessage = "Camera permission denied."
+                        self.selectedSource = .screen
+                    }
+                }
+            }
+        default:
+            cameraAccessDenied = true
+            statusMessage = "Camera permission denied."
+            selectedSource = .screen
+        }
+    }
+
+    private func startCamera(deviceID: String?) {
+        refreshCameraDevices()
+        do {
+            try cameraCaptureService.start(deviceID: deviceID)
+            cameraAccessDenied = false
+            if case .camera(let id) = selectedSource, id == nil, let first = availableCameras.first {
+                selectedSource = .camera(deviceID: first.id)
+            }
+            statusMessage = "Camera mode."
+        } catch CameraCaptureError.deviceUnavailable {
+            statusMessage = "No camera available."
+            selectedSource = .screen
+        } catch CameraCaptureError.permissionDenied {
+            cameraAccessDenied = true
+            statusMessage = "Camera permission denied."
+            selectedSource = .screen
+        } catch {
+            statusMessage = "Failed to start camera."
+            selectedSource = .screen
         }
     }
 

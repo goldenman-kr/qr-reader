@@ -13,12 +13,18 @@ struct OverlayView: View {
             PhoneCameraFrameView(
                 size: phoneSize,
                 onShutterTap: { viewModel.captureAndScan() },
-                selectedSource: viewModel.selectedSource,
+                selectedSourceTitle: viewModel.selectedSourceTitle,
+                sourceOptions: viewModel.sourceOptions.map { .init(source: $0.source, title: $0.title) },
+                statusMessage: viewModel.statusMessage,
                 onSelectSource: { source in
-                    viewModel.selectedSource = source
+                    viewModel.selectSource(source)
                 }
             ) {
-                PreviewPlaceholderView()
+                if viewModel.shouldShowCameraPreview {
+                    CameraPreviewView(session: viewModel.cameraSession)
+                } else {
+                    PreviewPlaceholderView()
+                }
             }
 
             VStack {
@@ -29,17 +35,6 @@ struct OverlayView: View {
                 Spacer()
             }
 
-            VStack {
-                Spacer()
-                Text(viewModel.statusMessage)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.88))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.black)
-                    .clipShape(Capsule())
-                    .padding(.bottom, 8)
-            }
         }
         .frame(width: phoneSize.width, height: phoneSize.height)
         .background(Color.clear)
@@ -66,6 +61,7 @@ struct OverlayView: View {
         )
         .onAppear {
             viewModel.refreshScreenPermission()
+            viewModel.refreshCameraDevices()
         }
         .onChange(of: viewModel.latestResults) { _, newResults in
             if newResults.isEmpty {
@@ -75,17 +71,14 @@ struct OverlayView: View {
             resultsStore.update(with: newResults)
             openWindow(id: "scan-results-window")
         }
-        .onChange(of: viewModel.debugCaptureVersion) { _, _ in
-            openWindow(id: "captured-image-debug-window")
-        }
         .onReceive(NotificationCenter.default.publisher(for: .openHistoryFromAppMenu)) { _ in
             openWindow(id: "history-window")
         }
-        .alert("No QR code found", isPresented: $showNoResultAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Try moving the scanner frame over a QR code and capture again.")
-        }
+        // .alert("No QR code found", isPresented: $showNoResultAlert) {
+        //     Button("OK", role: .cancel) {}
+        // } message: {
+        //     Text("Try moving the scanner frame over a QR code and capture again.")
+        // }
     }
 }
 
