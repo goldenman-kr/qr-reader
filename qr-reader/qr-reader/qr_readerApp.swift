@@ -40,10 +40,5 @@ struct qr_readerApp: App {
                 .environmentObject(resultsStore)
         }
         .defaultSize(width: 560, height: 380)
-
-        Window("Captured Image Debug", id: "captured-image-debug-window") {
-            CapturedImageDebugView(viewModel: mainViewModel)
-        }
-        .defaultSize(width: 620, height: 460)
     }
 }

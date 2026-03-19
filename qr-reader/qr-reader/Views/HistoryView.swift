@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct HistoryView: View {
@@ -20,16 +21,23 @@ struct HistoryView: View {
                     .foregroundStyle(.secondary)
             } else {
                 List(historyStore.items) { item in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(item.source.displayName)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        ForEach(item.results) { result in
-                            Text(result.payload)
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(item.source.displayName)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            ForEach(item.results) { result in
+                                Text(result.payload)
+                            }
                         }
+                        Spacer(minLength: 8)
+                        Button("Copy") {
+                            copyHistoryItem(item)
+                        }
+                        .buttonStyle(.bordered)
                     }
                     .padding(.vertical, 4)
                 }
@@ -42,6 +50,13 @@ struct HistoryView: View {
                 window.isExcludedFromWindowsMenu = true
             }
         )
+    }
+
+    private func copyHistoryItem(_ item: ScanHistoryItem) {
+        let payload = item.results.map(\.payload).joined(separator: "\n")
+        guard !payload.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(payload, forType: .string)
     }
 }
 

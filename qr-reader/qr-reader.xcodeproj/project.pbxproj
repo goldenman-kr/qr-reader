@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		6466D2AA2F6BC3D60000B13B /* qr-reader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "qr-reader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6466D2AA2F6BC3D60000B13B /* qr-reader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "qr-reader.app"; path = "QR Reader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -260,9 +260,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is used when Capture Source is switched to camera input.";
 				INFOPLIST_KEY_CFBundleDisplayName = "QR Reader";
 				INFOPLIST_KEY_CFBundleName = "QR Reader";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is used when Capture Source is switched to camera input.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Screen recording access is used to scan QR codes from your screen.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -297,9 +297,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is used when Capture Source is switched to camera input.";
 				INFOPLIST_KEY_CFBundleDisplayName = "QR Reader";
 				INFOPLIST_KEY_CFBundleName = "QR Reader";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is used when Capture Source is switched to camera input.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Screen recording access is used to scan QR codes from your screen.";
 				LD_RUNPATH_SEARCH_PATHS = (

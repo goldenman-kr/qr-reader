@@ -10,19 +10,44 @@ final class AppMenuController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         buildMainMenu()
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.buildMainMenuIfNeeded(force: true)
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.buildMainMenuIfNeeded(force: false)
+        }
+    }
+
+    private func buildMainMenuIfNeeded(force: Bool) {
+        guard force || needsMainMenuRebuild() else { return }
+        buildMainMenu()
+    }
+
+    private func needsMainMenuRebuild() -> Bool {
+        guard let items = NSApp.mainMenu?.items else { return true }
+        let titles = items.map { $0.title.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return titles.contains("View") || titles.contains("Format") || !titles.contains("Window")
+    }
+
     private func buildMainMenu() {
-        let mainMenu = NSMenu()
-
-        // App menu
-        let appMenuItem = NSMenuItem()
-        mainMenu.addItem(appMenuItem)
-        let appMenu = NSMenu(title: "App")
-        appMenuItem.submenu = appMenu
-
         let appName =
             (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ??
             (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String) ??
             ProcessInfo.processInfo.processName
+
+        let mainMenu = NSMenu()
+
+        // App menu
+        let appMenuItem = NSMenuItem()
+        appMenuItem.title = appName
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu(title: "App")
+        appMenuItem.submenu = appMenu
+
         appMenu.addItem(
             NSMenuItem(
                 title: "Quit \(appName)",
@@ -47,6 +72,7 @@ final class AppMenuController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let helpMenu = NSMenu(title: "Help")
         helpRootItem.submenu = helpMenu
         helpRootItem.title = "Help"
+        NSApp.helpMenu = helpMenu
 
         NSApp.mainMenu = mainMenu
     }
