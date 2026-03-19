@@ -36,6 +36,12 @@ struct HistoryView: View {
             }
         }
         .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            WindowConfigurator { window in
+                window.isExcludedFromWindowsMenu = true
+            }
+        )
     }
 }
 

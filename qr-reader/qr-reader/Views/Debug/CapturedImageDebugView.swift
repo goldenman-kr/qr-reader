@@ -33,6 +33,12 @@ struct CapturedImageDebugView: View {
         }
         .padding(14)
         .frame(minWidth: 520, minHeight: 360)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            WindowConfigurator { window in
+                window.isExcludedFromWindowsMenu = true
+            }
+        )
     }
 
     private var infoText: String {

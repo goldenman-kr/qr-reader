@@ -18,12 +18,12 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .pasteboard) {}
         CommandGroup(replacing: .textEditing) {}
         CommandGroup(replacing: .textFormatting) {}
+        CommandGroup(replacing: .newItem) {}
 
         // Remove default View menu sections.
-        CommandGroup(replacing: .sidebar) {
-        }
-        CommandGroup(replacing: .toolbar) {
-        }
+        CommandGroup(replacing: .sidebar) {}
+        CommandGroup(replacing: .toolbar) {}
         CommandGroup(replacing: .windowSize) {}
+        CommandGroup(replacing: .help) {}
     }
 }

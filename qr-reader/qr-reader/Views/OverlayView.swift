@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct OverlayView: View {
     @ObservedObject var viewModel: MainViewModel
@@ -18,6 +19,14 @@ struct OverlayView: View {
                 }
             ) {
                 PreviewPlaceholderView()
+            }
+
+            VStack {
+                Text("QR Reader")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .padding(.top, 10)
+                Spacer()
             }
 
             VStack {
@@ -49,6 +58,7 @@ struct OverlayView: View {
                 window.standardWindowButton(.closeButton)?.isHidden = false
                 window.standardWindowButton(.miniaturizeButton)?.isHidden = true
                 window.standardWindowButton(.zoomButton)?.isHidden = true
+                window.isExcludedFromWindowsMenu = true
                 viewModel.updateWindowFrameInScreen(window.frame)
                 let contentRect = window.convertToScreen(window.contentLayoutRect)
                 viewModel.updateWindowContentRectInScreen(contentRect)
@@ -67,6 +77,9 @@ struct OverlayView: View {
         }
         .onChange(of: viewModel.debugCaptureVersion) { _, _ in
             openWindow(id: "captured-image-debug-window")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openHistoryFromAppMenu)) { _ in
+            openWindow(id: "history-window")
         }
         .alert("No QR code found", isPresented: $showNoResultAlert) {
             Button("OK", role: .cancel) {}

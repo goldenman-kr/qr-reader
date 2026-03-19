@@ -78,29 +78,7 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
     }
 
     private var controlsArea: some View {
-        HStack(spacing: 22) {
-            Menu {
-                Button("Screen") { onSelectSource(.screen) }
-                Button("Camera") { onSelectSource(.camera(deviceID: nil)) }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "rectangle.stack.badge.person.crop")
-                    Text(selectedSource.displayName)
-                        .font(.caption)
-                    Image(systemName: "chevron.down")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.white.opacity(0.95))
-                .padding(.horizontal, 10)
-                .frame(height: 36)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color(nsColor: NSColor(calibratedWhite: 0.22, alpha: 1.0)))
-                )
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
+        ZStack {
             Button(action: onShutterTap) {
                 Circle()
                     .fill(.white)
@@ -112,8 +90,31 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.space, modifiers: [])
-
-            Spacer(minLength: 4)
+            
+            HStack {
+                Spacer()
+                Menu {
+                    Button("Screen") { onSelectSource(.screen) }
+                    Button("Camera") { onSelectSource(.camera(deviceID: nil)) }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "rectangle.stack.badge.person.crop")
+                        Text(selectedSource.displayName)
+                            .font(.caption)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.white.opacity(0.95))
+                    .padding(.horizontal, 10)
+                    .frame(height: 36)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color(nsColor: NSColor(calibratedWhite: 0.22, alpha: 1.0)))
+                    )
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
         }
         .frame(height: 84)
     }

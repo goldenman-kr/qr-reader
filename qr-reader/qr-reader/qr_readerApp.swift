@@ -9,6 +9,7 @@ import SwiftUI
 
 @main
 struct qr_readerApp: App {
+    @NSApplicationDelegateAdaptor(AppMenuController.self) private var appMenuController
     @StateObject private var historyStore = UserDefaultsHistoryStore()
     @StateObject private var resultsStore = ScanResultsStore()
     @StateObject private var mainViewModel: MainViewModel
@@ -27,9 +28,6 @@ struct qr_readerApp: App {
         }
         .defaultSize(width: 340, height: 700)
         .windowResizability(.contentSize)
-        .commands {
-            AppCommands()
-        }
 
         Window("History", id: "history-window") {
             HistoryView()

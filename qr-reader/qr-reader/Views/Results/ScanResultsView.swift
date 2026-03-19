@@ -45,6 +45,12 @@ struct ScanResultsView: View {
         }
         .padding(16)
         .frame(minWidth: 500, minHeight: 320)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            WindowConfigurator { window in
+                window.isExcludedFromWindowsMenu = true
+            }
+        )
     }
 }
 
