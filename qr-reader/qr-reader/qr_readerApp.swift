@@ -26,7 +26,8 @@ struct qr_readerApp: App {
                 .environmentObject(historyStore)
                 .environmentObject(resultsStore)
         }
-        .defaultSize(width: 340, height: 700)
+        .defaultSize(width: PhoneLayout.phoneSize.width, height: PhoneLayout.phoneSize.height)
+        .windowStyle(.plain)
         .windowResizability(.contentSize)
 
         Window("History", id: "history-window") {

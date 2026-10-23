@@ -4,204 +4,185 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
     struct SourceOption: Identifiable {
         let source: CaptureSource
         let title: String
-        var id: String { source.id + ":" + title }
+        var id: String { source.id }
     }
 
     let size: CGSize
     let onShutterTap: () -> Void
     let selectedSourceTitle: String
+    let selectedSource: CaptureSource
     let sourceOptions: [SourceOption]
     let statusMessage: String
     let onSelectSource: (CaptureSource) -> Void
-    @State private var isSourcePopoverPresented = false
-    @ViewBuilder var previewContent: PreviewContent
+    let onRefreshCameras: () -> Void
+    let onCameraMode: () -> Bool
+    let onClose: () -> Void
+    let onHistory: () -> Void
+    @ViewBuilder var previewContent: () -> PreviewContent
+    @State private var showingDevices = false
 
-    init(
-        size: CGSize = CGSize(width: 320, height: 680),
-        onShutterTap: @escaping () -> Void = {},
-        selectedSourceTitle: String = "Screen",
-        sourceOptions: [SourceOption] = [
-            .init(source: .screen, title: "Screen")
-        ],
-        statusMessage: String = "",
-        onSelectSource: @escaping (CaptureSource) -> Void = { _ in },
-        @ViewBuilder previewContent: () -> PreviewContent
-    ) {
-        self.size = size
-        self.onShutterTap = onShutterTap
-        self.selectedSourceTitle = selectedSourceTitle
-        self.sourceOptions = sourceOptions
-        self.statusMessage = statusMessage
-        self.onSelectSource = onSelectSource
-        self.previewContent = previewContent()
+    private var cameraMode: Bool {
+        if case .camera = selectedSource { return true }
+        return false
+    }
+
+    private var cameras: [SourceOption] {
+        sourceOptions.filter { if case .camera = $0.source { return true }; return false }
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let fullRect = CGRect(origin: .zero, size: proxy.size)
-            let viewfinderRect = PhoneLayout.viewfinderRect(in: fullRect.size)
-
-            ZStack {
-                PhoneBodyShape(
-                    outerRect: fullRect,
-                    cutoutRect: viewfinderRect,
-                    outerRadius: PhoneLayout.outerCornerRadius,
-                    cutoutRadius: PhoneLayout.viewfinderCornerRadius
-                )
-                // Body is fully opaque; only cutout remains transparent.
-                .fill(Color(nsColor: NSColor(calibratedWhite: 0.01, alpha: 1.0)), style: FillStyle(eoFill: true))
-                .overlay {
-                    RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius, style: .continuous)
-                        .stroke(Color(nsColor: NSColor(calibratedWhite: 0.85, alpha: 1.0)), lineWidth: 1.1)
-                }
-                .shadow(color: .black.opacity(0.15), radius: 16, y: 8)
-
-                previewContent
-                    .frame(width: viewfinderRect.width, height: viewfinderRect.height)
-                    .position(x: viewfinderRect.midX, y: viewfinderRect.midY)
-
-                RoundedRectangle(cornerRadius: PhoneLayout.viewfinderCornerRadius, style: .continuous)
-                    .stroke(Color(nsColor: NSColor(calibratedWhite: 0.9, alpha: 1.0)), lineWidth: 1)
-                    .frame(width: viewfinderRect.width, height: viewfinderRect.height)
-                    .position(x: viewfinderRect.midX, y: viewfinderRect.midY)
-
-                VStack(spacing: 0) {
-                    notch
-                        .padding(.top, 12)
+        let viewport = PhoneLayout.viewfinderRect(in: size)
+        ZStack(alignment: .top) {
+            CameraHousing(hole: viewport)
+                .fill(LinearGradient(colors: [Color(white: 0.18), Color(white: 0.075), Color(white: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing), style: FillStyle(eoFill: true))
+            RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.12), .white.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                .padding(1).allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius - 3, style: .continuous)
+                .strokeBorder(.black.opacity(0.8), lineWidth: 2)
+                .padding(3).allowsHitTesting(false)
+            previewContent()
+                .frame(width: viewport.width, height: viewport.height)
+                .clipShape(RoundedRectangle(cornerRadius: PhoneLayout.viewfinderCornerRadius))
+                .position(x: viewport.midX, y: viewport.midY)
+            RoundedRectangle(cornerRadius: PhoneLayout.viewfinderCornerRadius)
+                .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                .frame(width: viewport.width, height: viewport.height)
+                .position(x: viewport.midX, y: viewport.midY)
+                .allowsHitTesting(false)
+            VStack(spacing: 0) {
+                HStack {
+                    iconButton("xmark", help: "Close scanner", action: onClose)
+                        .keyboardShortcut("w", modifiers: .command)
                     Spacer()
-                    controlsArea
-                        .padding(.horizontal, 18)
-                        .padding(.top, 12)
-                        .padding(.bottom, 16)
+                    Text("QR Reader").font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Spacer()
+                    iconButton("clock.arrow.circlepath", help: "Scan history", action: onHistory)
                 }
+                .padding(.horizontal, 18)
+                .frame(height: viewport.minY)
+                Spacer(minLength: 0)
+                controls.frame(height: size.height - viewport.maxY)
             }
-            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .frame(width: size.width, height: size.height)
+        .preferredColorScheme(.dark)
     }
 
-    private var notch: some View {
-        Capsule(style: .continuous)
-            .fill(Color.black)
-            .frame(width: min(size.width * 0.34, 132), height: 26)
-            .overlay {
-                Circle()
-                    .fill(Color(nsColor: NSColor(calibratedWhite: 0.15, alpha: 1.0)))
-                    .frame(width: 7, height: 7)
-                    .offset(x: 32)
-            }
-    }
-
-    private var controlsArea: some View {
+    private var controls: some View {
         VStack(spacing: 8) {
+            HStack(spacing: 2) {
+                modeButton("Screen", icon: "display", selected: !cameraMode) {
+                    onSelectSource(.screen)
+                }
+                modeButton("Camera", icon: "camera", selected: cameraMode) {
+                    showingDevices = onCameraMode()
+                }
+            }
+            .padding(3)
+            .background(.black.opacity(0.25), in: Capsule())
+            .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.5))
+            Button {
+                onRefreshCameras()
+                showingDevices = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text(cameraMode ? selectedSourceTitle : "Choose camera").lineLimit(1)
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                }
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.65))
+                .frame(maxWidth: 250).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showingDevices, arrowEdge: .top) { devicePicker }
             Button(action: onShutterTap) {
-                Circle()
-                    .fill(.white)
-                    .frame(width: 66, height: 66)
-                    .overlay {
-                        Circle()
-                            .stroke(.black.opacity(0.15), lineWidth: 2)
-                    }
+                Circle().fill(.white).padding(5)
+                    .overlay(Circle().stroke(.white.opacity(0.95), lineWidth: 2))
+                    .frame(width: 54, height: 54)
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.space, modifiers: [])
+            .help("Capture and scan · Space").accessibilityLabel("Capture and scan")
+            Text(["Ready", "Screen mode.", "Camera mode."].contains(statusMessage) ? "Space to capture" : statusMessage)
+                .font(.system(size: 10)).foregroundStyle(.white.opacity(0.6))
+                .lineLimit(1).padding(.horizontal, 20)
+        }
+        .padding(.top, 8).padding(.bottom, 12)
+    }
 
-            Button {
-                isSourcePopoverPresented.toggle()
-                #if DEBUG
-                print("[SourceSelector] tapped, popover=\(isSourcePopoverPresented)")
-                #endif
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "rectangle.stack.badge.person.crop")
-                    Text(selectedSourceTitle)
-                        .font(.caption)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.white.opacity(0.95))
-                .padding(.horizontal, 10)
-                .frame(height: 36)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color(nsColor: NSColor(calibratedWhite: 0.22, alpha: 1.0)))
-                )
+    private var devicePicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Camera").font(.headline)
+                Spacer()
+                Button(action: onRefreshCameras) { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.plain).help("Refresh cameras")
             }
-            .buttonStyle(.plain)
-            .fixedSize()
-            .contentShape(Rectangle())
-            .popover(isPresented: $isSourcePopoverPresented, arrowEdge: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Button("Screen") {
-                        onSelectSource(.screen)
-                        isSourcePopoverPresented = false
-                    }
-                    .buttonStyle(.plain)
-
-                    let cameraOptions = sourceOptions.filter {
-                        if case .camera = $0.source { return true }
-                        return false
-                    }
-                    if cameraOptions.isEmpty {
-                        Button("Camera...") {
-                            onSelectSource(.camera(deviceID: nil))
-                            isSourcePopoverPresented = false
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        ForEach(cameraOptions) { option in
-                            Button(option.title) {
-                                onSelectSource(option.source)
-                                isSourcePopoverPresented = false
+            if cameras.isEmpty {
+                Text("No connected cameras").foregroundStyle(.secondary).padding(.vertical, 12)
+            } else {
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach(cameras) { camera in
+                            Button {
+                                onSelectSource(camera.source)
+                                showingDevices = false
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "video")
+                                    Text(camera.title).lineLimit(2)
+                                    Spacer()
+                                    if camera.source == selectedSource {
+                                        Image(systemName: "checkmark").fontWeight(.semibold)
+                                    }
+                                }
+                                .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(camera.source == selectedSource ? Color.white.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
-                .padding(10)
-                .frame(minWidth: 180, alignment: .leading)
+                .frame(height: min(CGFloat(cameras.count) * 48, 240))
             }
-
-            Text(statusMessage)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.88))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.black)
-                .clipShape(Capsule())
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: size.width - 36)
         }
+        .padding(16).frame(width: 280)
     }
 
+    private func iconButton(_ icon: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8)).frame(width: 30, height: 30)
+                .background(.white.opacity(0.055), in: Circle())
+                .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain).help(help).accessibilityLabel(help)
+    }
+
+    private func modeButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon).font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(selected ? 1 : 0.5))
+                .frame(width: 100, height: 26)
+                .background(selected ? Color.white.opacity(0.14) : .clear, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
 }
 
-private struct PhoneBodyShape: Shape {
-    let outerRect: CGRect
-    let cutoutRect: CGRect
-    let outerRadius: CGFloat
-    let cutoutRadius: CGFloat
-
-    func path(in _: CGRect) -> Path {
+private struct CameraHousing: Shape {
+    let hole: CGRect
+    func path(in rect: CGRect) -> Path {
         var path = Path()
-        path.addRoundedRect(in: outerRect, cornerSize: CGSize(width: outerRadius, height: outerRadius))
-        path.addRoundedRect(in: cutoutRect, cornerSize: CGSize(width: cutoutRadius, height: cutoutRadius))
+        path.addRoundedRect(in: rect, cornerSize: CGSize(width: PhoneLayout.outerCornerRadius, height: PhoneLayout.outerCornerRadius))
+        path.addRoundedRect(in: hole, cornerSize: CGSize(width: PhoneLayout.viewfinderCornerRadius, height: PhoneLayout.viewfinderCornerRadius))
         return path
     }
 }
 
 struct PreviewPlaceholderView: View {
-    var body: some View {
-        Color.clear
-    }
-}
-
-#Preview("Phone Camera Frame") {
-    PhoneCameraFrameView {
-        PreviewPlaceholderView()
-    }
-    .padding(20)
-    .background(Color(nsColor: .underPageBackgroundColor))
+    var body: some View { Color.clear }
 }

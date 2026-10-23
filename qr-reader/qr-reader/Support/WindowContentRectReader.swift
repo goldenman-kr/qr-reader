@@ -50,8 +50,9 @@ final class ContentRectReportingView: NSView {
 
     func reportContentRectIfPossible() {
         guard let window, let onRectChange else { return }
-        // contentLayoutRect is the actual SwiftUI layout area after titlebar chrome.
-        let contentRect = window.convertToScreen(window.contentLayoutRect).standardized
+        // The scanner extends beneath the hidden titlebar with ignoresSafeArea.
+        guard let contentView = window.contentView else { return }
+        let contentRect = window.convertToScreen(contentView.convert(contentView.bounds, to: nil)).standardized
         let windowFrame = window.frame.standardized
         guard contentRect != lastContentRect || windowFrame != lastWindowFrame else { return }
         lastContentRect = contentRect

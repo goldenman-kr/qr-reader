@@ -54,13 +54,31 @@ final class MainViewModel: ObservableObject {
                 await cameraCaptureService.stopIfInactive()
             }
         case .camera(let deviceID):
+            if let deviceID { UserDefaults.standard.set(deviceID, forKey: "lastCameraDeviceID") }
             cameraCaptureService.setDesiredCameraRequest(requestID)
             activateCameraSource(deviceID: deviceID, requestID: requestID)
         }
     }
 
     func refreshCameraDevices() {
-        availableCameras = cameraCaptureService.discoverDevices()
+        let devices = cameraCaptureService.discoverDevices()
+        if devices != availableCameras { availableCameras = devices }
+    }
+
+    /// Returns true when the user needs to choose a device in the popover.
+    func selectCameraMode() -> Bool {
+        refreshCameraDevices()
+        if case .camera = selectedSource { return true }
+        let lastID = UserDefaults.standard.string(forKey: "lastCameraDeviceID")
+        if let camera = availableCameras.first(where: { $0.id == lastID }) {
+            selectSource(.camera(deviceID: camera.id))
+            return false
+        }
+        if availableCameras.count == 1, let camera = availableCameras.first {
+            selectSource(.camera(deviceID: camera.id))
+            return false
+        }
+        return true
     }
 
     var sourceOptions: [(source: CaptureSource, title: String)] {
@@ -231,10 +249,13 @@ final class MainViewModel: ObservableObject {
         } catch is CancellationError {
             return
         } catch CameraCaptureError.deviceUnavailable {
+            guard isCurrentCameraRequest(requestID, deviceID: deviceID) else { return }
             fallBackToScreen(message: "No camera available.")
         } catch CameraCaptureError.permissionDenied {
+            guard isCurrentCameraRequest(requestID, deviceID: deviceID) else { return }
             fallBackToScreen(message: "Camera permission denied.", accessDenied: true)
         } catch {
+            guard isCurrentCameraRequest(requestID, deviceID: deviceID) else { return }
             fallBackToScreen(message: "Failed to start camera.")
         }
     }
