@@ -55,7 +55,7 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
                     iconButton("xmark", help: "Close scanner", action: onClose)
                         .keyboardShortcut("w", modifiers: .command)
                     Spacer()
-                    Text("QR Reader").font(.system(size: 13, weight: .semibold))
+                    Text("Mr. QR").font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                     Spacer()
                     iconButton("clock.arrow.circlepath", help: "Scan history", action: onHistory)
