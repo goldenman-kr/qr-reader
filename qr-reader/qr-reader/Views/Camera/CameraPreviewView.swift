@@ -11,7 +11,9 @@ struct CameraPreviewView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: PreviewContainerView, context: Context) {
-        nsView.previewLayer.session = session
+        if nsView.previewLayer.session !== session {
+            nsView.previewLayer.session = session
+        }
     }
 }
 

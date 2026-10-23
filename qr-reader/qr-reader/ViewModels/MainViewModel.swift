@@ -25,6 +25,7 @@ final class MainViewModel: ObservableObject {
     private let oneShotCaptureService = OneShotScreenCaptureService()
     private let cameraCaptureService = CameraCaptureService()
     private let qrDetector = VisionQRDetector()
+    private var cameraRequestID = 0
 
     init(historyStore: HistoryStore) {
         self.historyStore = historyStore
@@ -41,14 +42,20 @@ final class MainViewModel: ObservableObject {
     }
 
     func selectSource(_ source: CaptureSource) {
+        cameraRequestID += 1
+        let requestID = cameraRequestID
         selectedSource = source
         switch source {
         case .screen:
-            cameraCaptureService.stop()
+            cameraCaptureService.setDesiredCameraRequest(nil)
             cameraAccessDenied = false
             statusMessage = "Screen mode."
+            Task {
+                await cameraCaptureService.stopIfInactive()
+            }
         case .camera(let deviceID):
-            activateCameraSource(deviceID: deviceID)
+            cameraCaptureService.setDesiredCameraRequest(requestID)
+            activateCameraSource(deviceID: deviceID, requestID: requestID)
         }
     }
 
@@ -187,51 +194,78 @@ final class MainViewModel: ObservableObject {
         }
     }
 
-    private func activateCameraSource(deviceID: String?) {
+    private func activateCameraSource(deviceID: String?, requestID: Int) {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
         case .authorized:
-            startCamera(deviceID: deviceID)
+            Task {
+                await startCamera(deviceID: deviceID, requestID: requestID)
+            }
         case .notDetermined:
             Task {
                 let granted = await CameraCaptureService.requestAccess()
-                await MainActor.run {
-                    if granted {
-                        self.cameraAccessDenied = false
-                        self.startCamera(deviceID: deviceID)
-                    } else {
-                        self.cameraAccessDenied = true
-                        self.statusMessage = "Camera permission denied."
-                        self.selectedSource = .screen
-                    }
+                guard isCurrentCameraRequest(requestID, deviceID: deviceID) else { return }
+                if granted {
+                    cameraAccessDenied = false
+                    await startCamera(deviceID: deviceID, requestID: requestID)
+                } else {
+                    fallBackToScreen(message: "Camera permission denied.", accessDenied: true)
                 }
             }
         default:
-            cameraAccessDenied = true
-            statusMessage = "Camera permission denied."
-            selectedSource = .screen
+            fallBackToScreen(message: "Camera permission denied.", accessDenied: true)
         }
     }
 
-    private func startCamera(deviceID: String?) {
+    private func startCamera(deviceID: String?, requestID: Int) async {
+        guard isCurrentCameraRequest(requestID, deviceID: deviceID) else { return }
         refreshCameraDevices()
         do {
-            try cameraCaptureService.start(deviceID: deviceID)
+            try await cameraCaptureService.start(deviceID: deviceID, requestID: requestID)
+            guard isCurrentCameraRequest(requestID, deviceID: deviceID) else { return }
             cameraAccessDenied = false
             if case .camera(let id) = selectedSource, id == nil, let first = availableCameras.first {
                 selectedSource = .camera(deviceID: first.id)
             }
             statusMessage = "Camera mode."
+        } catch is CancellationError {
+            return
         } catch CameraCaptureError.deviceUnavailable {
-            statusMessage = "No camera available."
-            selectedSource = .screen
+            fallBackToScreen(message: "No camera available.")
         } catch CameraCaptureError.permissionDenied {
-            cameraAccessDenied = true
-            statusMessage = "Camera permission denied."
-            selectedSource = .screen
+            fallBackToScreen(message: "Camera permission denied.", accessDenied: true)
         } catch {
-            statusMessage = "Failed to start camera."
-            selectedSource = .screen
+            fallBackToScreen(message: "Failed to start camera.")
+        }
+    }
+
+    func pauseCamera() {
+        cameraRequestID += 1
+        cameraCaptureService.setDesiredCameraRequest(nil)
+        Task {
+            await cameraCaptureService.stopIfInactive()
+        }
+    }
+
+    func resumeCameraIfNeeded() {
+        guard case .camera(let deviceID) = selectedSource else { return }
+        cameraRequestID += 1
+        cameraCaptureService.setDesiredCameraRequest(cameraRequestID)
+        activateCameraSource(deviceID: deviceID, requestID: cameraRequestID)
+    }
+
+    private func isCurrentCameraRequest(_ requestID: Int, deviceID: String?) -> Bool {
+        guard requestID == cameraRequestID else { return false }
+        return selectedSource == .camera(deviceID: deviceID)
+    }
+
+    private func fallBackToScreen(message: String, accessDenied: Bool = false) {
+        selectedSource = .screen
+        cameraAccessDenied = accessDenied
+        statusMessage = message
+        cameraCaptureService.setDesiredCameraRequest(nil)
+        Task {
+            await cameraCaptureService.stopIfInactive()
         }
     }
 
@@ -256,12 +290,14 @@ final class MainViewModel: ObservableObject {
     func updateWindowFrameInScreen(_ rect: CGRect) {
         let standardized = rect.standardized
         guard standardized.width > 0, standardized.height > 0 else { return }
+        guard windowFrameInScreen != standardized else { return }
         windowFrameInScreen = standardized
     }
 
     func updateWindowContentRectInScreen(_ rect: CGRect) {
         let standardized = rect.standardized
         guard standardized.width > 0, standardized.height > 0 else { return }
+        guard windowContentRectInScreen != standardized else { return }
         windowContentRectInScreen = standardized
     }
 

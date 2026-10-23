@@ -5,6 +5,7 @@ struct OverlayView: View {
     @ObservedObject var viewModel: MainViewModel
     @EnvironmentObject private var resultsStore: ScanResultsStore
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.scenePhase) private var scenePhase
     private let phoneSize = PhoneLayout.phoneSize
     @State private var showNoResultAlert = false
 
@@ -47,21 +48,40 @@ struct OverlayView: View {
                 window.isMovableByWindowBackground = true
                 window.level = .floating
                 window.styleMask = [.titled, .closable, .fullSizeContentView]
-                window.setContentSize(phoneSize)
+                if window.contentLayoutRect.size != phoneSize {
+                    window.setContentSize(phoneSize)
+                }
                 window.titleVisibility = .hidden
                 window.titlebarAppearsTransparent = true
                 window.standardWindowButton(.closeButton)?.isHidden = false
                 window.standardWindowButton(.miniaturizeButton)?.isHidden = true
                 window.standardWindowButton(.zoomButton)?.isHidden = true
                 window.isExcludedFromWindowsMenu = true
-                viewModel.updateWindowFrameInScreen(window.frame)
-                let contentRect = window.convertToScreen(window.contentLayoutRect)
+            }
+        )
+        .background(
+            WindowContentRectReader { contentRect, windowFrame in
                 viewModel.updateWindowContentRectInScreen(contentRect)
+                viewModel.updateWindowFrameInScreen(windowFrame)
             }
         )
         .onAppear {
             viewModel.refreshScreenPermission()
             viewModel.refreshCameraDevices()
+            viewModel.resumeCameraIfNeeded()
+        }
+        .onDisappear {
+            viewModel.pauseCamera()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                viewModel.resumeCameraIfNeeded()
+            case .inactive, .background:
+                viewModel.pauseCamera()
+            @unknown default:
+                viewModel.pauseCamera()
+            }
         }
         .onChange(of: viewModel.latestResults) { _, newResults in
             if newResults.isEmpty {
