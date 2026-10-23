@@ -34,19 +34,72 @@ struct PhoneCameraFrameView<PreviewContent: View>: View {
         let viewport = PhoneLayout.viewfinderRect(in: size)
         ZStack(alignment: .top) {
             CameraHousing(hole: viewport)
-                .fill(LinearGradient(colors: [Color(white: 0.18), Color(white: 0.075), Color(white: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing), style: FillStyle(eoFill: true))
+                .fill(
+                    LinearGradient(stops: [
+                        .init(color: Color(white: 0.09), location: 0),
+                        .init(color: Color(white: 0.23), location: 0.075),
+                        .init(color: Color(white: 0.16), location: 0.20),
+                        .init(color: Color(white: 0.105), location: 0.46),
+                        .init(color: Color(white: 0.12), location: 0.68),
+                        .init(color: Color(white: 0.21), location: 0.91),
+                        .init(color: Color(white: 0.10), location: 1)
+                    ], startPoint: .leading, endPoint: .trailing),
+                    style: FillStyle(eoFill: true)
+                )
+            // Broad, static softbox reflections leave the viewfinder completely clear.
+            CameraHousing(hole: viewport)
+                .fill(
+                    EllipticalGradient(colors: [.white.opacity(0.12), .white.opacity(0.035), .clear],
+                                       center: UnitPoint(x: 0.18, y: -0.12),
+                                       startRadiusFraction: 0, endRadiusFraction: 0.85),
+                    style: FillStyle(eoFill: true)
+                )
+                .allowsHitTesting(false)
+            CameraHousing(hole: viewport)
+                .fill(
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black.opacity(0.16), location: 0.48),
+                        .init(color: .black.opacity(0.22), location: 0.72),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom),
+                    style: FillStyle(eoFill: true)
+                )
+                .allowsHitTesting(false)
+            CameraHousing(hole: viewport)
+                .fill(
+                    EllipticalGradient(colors: [.white.opacity(0.085), .clear],
+                                       center: UnitPoint(x: 0.88, y: 1.08),
+                                       startRadiusFraction: 0, endRadiusFraction: 0.65),
+                    style: FillStyle(eoFill: true)
+                )
+                .allowsHitTesting(false)
             RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius, style: .continuous)
-                .strokeBorder(LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.12), .white.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                .strokeBorder(Color(white: 0.12), lineWidth: 1)
+                .allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius - 1, style: .continuous)
+                .strokeBorder(LinearGradient(stops: [
+                    .init(color: Color(white: 0.82), location: 0),
+                    .init(color: Color(white: 0.48), location: 0.20),
+                    .init(color: Color(white: 0.24), location: 0.50),
+                    .init(color: Color(white: 0.44), location: 0.78),
+                    .init(color: Color(white: 0.72), location: 1)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.25)
                 .padding(1).allowsHitTesting(false)
             RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius - 3, style: .continuous)
                 .strokeBorder(.black.opacity(0.8), lineWidth: 2)
                 .padding(3).allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: PhoneLayout.outerCornerRadius - 5, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.25), .white.opacity(0.03), .white.opacity(0.12)],
+                                             startPoint: .top, endPoint: .bottom), lineWidth: 0.5)
+                .padding(5).allowsHitTesting(false)
             previewContent()
                 .frame(width: viewport.width, height: viewport.height)
                 .clipShape(RoundedRectangle(cornerRadius: PhoneLayout.viewfinderCornerRadius))
                 .position(x: viewport.midX, y: viewport.midY)
             RoundedRectangle(cornerRadius: PhoneLayout.viewfinderCornerRadius)
-                .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                .stroke(LinearGradient(colors: [.black.opacity(0.9), .white.opacity(0.35)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
                 .frame(width: viewport.width, height: viewport.height)
                 .position(x: viewport.midX, y: viewport.midY)
                 .allowsHitTesting(false)
